@@ -90,7 +90,7 @@ module Mail
       @parts_list = parts_list
       @content_disposition_type = 'attachment'
       parts_list.map { |p|
-        (p.parts.empty? and p.attachment?) ? p : p.attachments
+        (p.parts.empty? && p.attachment?) ? p : p.attachments
       }.flatten.compact.each { |a| self << a }
       self
     end
