@@ -1,8 +1,17 @@
 version = 1
 
+test_patterns = ["spec/**"]
+
+exclude_patterns = [
+    "vendor/**",
+    "log/**",
+    "tmp/**",
+    "public/**"
+]
+
 [[analyzers]]
 name = "ruby"
 enabled = true
 
   [analyzers.meta]
-  plugin = "reek"
+  plugin = "rubocop"
