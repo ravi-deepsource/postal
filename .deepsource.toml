@@ -4,5 +4,6 @@ version = 1
 name = "ruby"
 enabled = true
 
-  [analyzers.meta]
-  plugin = "reek"
+[[transformers]]
+name = "rubocop"
+enabled = true
