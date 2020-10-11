@@ -1,7 +1,6 @@
 module Postal
   module MessageDB
     class Click
-
       def initialize(attributes, link)
         @url = link['url']
         @ip_address = attributes['ip_address']
@@ -13,7 +12,6 @@ module Postal
       attr_reader :user_agent
       attr_reader :timestamp
       attr_reader :url
-
     end
   end
 end

@@ -1,11 +1,10 @@
 module Postal
   class MessageRequeuer
-
     def run
-      Signal.trap("INT")  { @running ? @exit = true : Process.exit(0) }
-      Signal.trap("TERM") { @running ? @exit = true : Process.exit(0) }
+      Signal.trap('INT')  { @running ? @exit = true : Process.exit(0) }
+      Signal.trap('TERM') { @running ? @exit = true : Process.exit(0) }
 
-      log "Running message requeuer..."
+      log 'Running message requeuer...'
       loop do
         @running = true
         QueuedMessage.requeue_all
@@ -23,10 +22,9 @@ module Postal
 
     def check_exit
       if @exit
-        log "Exiting"
+        log 'Exiting'
         Process.exit(0)
       end
     end
-
   end
 end

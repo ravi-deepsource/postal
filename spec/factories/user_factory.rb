@@ -24,13 +24,11 @@
 #
 
 FactoryBot.define do
-
   factory :user do
-    first_name { "John" }
-    last_name { "Doe" }
-    password { "passw0rd" }
+    first_name { 'John' }
+    last_name { 'Doe' }
+    password { 'passw0rd' }
     email_verified_at { Time.now }
     sequence(:email_address) { |n| "user#{n}@example.com" }
   end
-
 end

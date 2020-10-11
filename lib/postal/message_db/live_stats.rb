@@ -1,7 +1,6 @@
 module Postal
   module MessageDB
     class LiveStats
-
       def initialize(database)
         @database = database
       end
@@ -22,20 +21,18 @@ module Postal
       # Return the total number of messages for the last 60 minutes
       #
       def total(minutes, options = {})
-        if minutes > 60
-          raise Postal::Error, "Live stats can only return data for the last 60 minutes."
-        end
-        options[:types] ||= [:incoming, :outgoing]
+        raise Postal::Error, 'Live stats can only return data for the last 60 minutes.' if minutes > 60
+
+        options[:types] ||= %i[incoming outgoing]
         if options[:types].empty?
-          raise Postal::Error, "You must provide at least one type to return"
+          raise Postal::Error, 'You must provide at least one type to return'
         else
           time = minutes.minutes.ago.beginning_of_minute.utc.to_f
-          types = options[:types].map {|t| "#{@database.escape(t.to_s)}"}.join(', ')
+          types = options[:types].map { |t| @database.escape(t.to_s).to_s }.join(', ')
           result = @database.query("SELECT SUM(count) as count FROM `#{@database.database_name}`.`live_stats` WHERE `type` IN (#{types}) AND timestamp > #{time}").first
           result['count'] || 0
         end
       end
-
     end
   end
 end

@@ -1,18 +1,15 @@
 module Postal
   class MessageParser
-
-    URL_REGEX = /(?<url>(?<protocol>https?)\:\/\/(?<domain>[A-Za-z0-9\-\.]+)(?<path>\/[A-Za-z0-9\/\.\/\+\?\&\-\_\%\=\~\:\;]+)?+)/
+    URL_REGEX = %r{(?<url>(?<protocol>https?)\://(?<domain>[A-Za-z0-9\-\.]+)(?<path>/[A-Za-z0-9/\./\+\?\&\-\_\%\=\~\:\;]+)?+)}.freeze
 
     def initialize(message)
       @message = message
       @actioned = false
       @tracked_links = 0
       @tracked_images = 0
-      @domain = @message.server.track_domains.where(:domain => @message.domain, :dns_status => "OK").first
+      @domain = @message.server.track_domains.where(domain: @message.domain, dns_status: 'OK').first
 
-      if @domain
-        @parsed_output = generate
-      end
+      @parsed_output = generate if @domain
     end
 
     attr_reader :tracked_links
@@ -33,11 +30,11 @@ module Postal
       @original_message = @message.raw_message
       if @mail.parts.empty?
         if @mail.mime_type
-          if @mail.mime_type =~ /text\/plain/
+          if @mail.mime_type =~ %r{text/plain}
             @mail.body = parse(@mail.body.decoded.dup, :text)
             @mail.content_transfer_encoding = nil
             @mail.charset = 'UTF-8'
-          elsif @mail.mime_type =~ /text\/html/
+          elsif @mail.mime_type =~ %r{text/html}
             @mail.body = parse(@mail.body.decoded.dup, :html)
             @mail.content_transfer_encoding = nil
             @mail.charset = 'UTF-8'
@@ -47,13 +44,11 @@ module Postal
         parse_parts(@mail.parts)
       end
       @mail.to_s
-    rescue => e
+    rescue StandardError => e
       if Rails.env.development?
         raise
       else
-        if defined?(Raven)
-          Raven.capture_exception(e)
-        end
+        Raven.capture_exception(e) if defined?(Raven)
         @actioned = false
         @tracked_links = 0
         @tracked_images = 0
@@ -63,30 +58,24 @@ module Postal
 
     def parse_parts(parts)
       parts.each do |part|
-        if part.content_type =~ /text\/html/
+        if part.content_type =~ %r{text/html}
           part.body = parse(part.body.decoded.dup, :html)
           part.content_transfer_encoding = nil
           part.charset = 'UTF-8'
-        elsif part.content_type =~ /text\/plain/
+        elsif part.content_type =~ %r{text/plain}
           part.body = parse(part.body.decoded.dup, :text)
           part.content_transfer_encoding = nil
           part.charset = 'UTF-8'
-        elsif part.content_type =~ /multipart\/(alternative|related)/
-          unless part.parts.empty?
-            parse_parts(part.parts)
-          end
+        elsif part.content_type =~ %r{multipart/(alternative|related)}
+          parse_parts(part.parts) unless part.parts.empty?
         end
       end
     end
 
     def parse(part, type = nil)
-      if Postal.tracking_available? && @domain.track_clicks?
-        part = insert_links(part, type)
-      end
+      part = insert_links(part, type) if Postal.tracking_available? && @domain.track_clicks?
 
-      if Postal.tracking_available? && @domain.track_loads? && type == :html
-        part = insert_tracking_image(part)
-      end
+      part = insert_tracking_image(part) if Postal.tracking_available? && @domain.track_loads? && type == :html
 
       part
     end
@@ -116,9 +105,9 @@ module Postal
         end
       end
 
-      part.gsub!(/(https?)\+notrack\:\/\//) do
+      part.gsub!(%r{(https?)\+notrack\://}) do
         @actioned = true
-        "#{$1}://"
+        "#{Regexp.last_match(1)}://"
       end
 
       part
@@ -127,8 +116,8 @@ module Postal
     def insert_tracking_image(part)
       @tracked_images += 1
       container = "<p class='ampimg' style='display:none;visibility:none;margin:0;padding:0;line-height:0;'><img src='#{domain}/img/#{@message.server.token}/#{@message.token}' alt=''></p>"
-      if part =~ /\<\/body\>/
-        part.gsub("</body>", "#{container}</body>")
+      if part =~ %r{\</body\>}
+        part.gsub('</body>', "#{container}</body>")
       else
         part + container
       end
@@ -141,6 +130,5 @@ module Postal
     def track_domain?(domain)
       !@domain.excluded_click_domains_array.include?(domain)
     end
-
   end
 end

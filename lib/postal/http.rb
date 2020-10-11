@@ -3,7 +3,6 @@ require 'uri'
 
 module Postal
   module HTTP
-
     def self.get(url, options = {})
       request(Net::HTTP::Get, url, options)
     end
@@ -15,8 +14,8 @@ module Postal
     def self.request(method, url, options = {})
       options[:headers] ||= {}
       uri = URI.parse(url)
-      request = method.new((uri.path.length == 0 ? "/" : uri.path) + (uri.query ? "?" + uri.query : ""))
-      options[:headers].each { |k,v| request.add_field k, v }
+      request = method.new((uri.path.length == 0 ? '/' : uri.path) + (uri.query ? '?' + uri.query : ''))
+      options[:headers].each { |k, v| request.add_field k, v }
 
       if options[:username] || uri.user
         request.basic_auth(options[:username] || uri.user, options[:password] || uri.password)
@@ -59,36 +58,34 @@ module Postal
         Timeout.timeout(timeout) do
           result = connection.request(request)
           {
-            :code => result.code.to_i,
-            :body => result.body,
-            :headers => result.to_hash,
-            :secure => @ssl
+            code: result.code.to_i,
+            body: result.body,
+            headers: result.to_hash,
+            secure: @ssl
           }
         end
       rescue OpenSSL::SSL::SSLError => e
         {
-          :code => -3,
-          :body => "Invalid SSL certificate",
-          :headers =>{},
-          :secure => @ssl
+          code: -3,
+          body: 'Invalid SSL certificate',
+          headers: {},
+          secure: @ssl
         }
       rescue SocketError, Errno::ECONNRESET, EOFError, Errno::EINVAL, Errno::ENETUNREACH, Errno::EHOSTUNREACH, Errno::ECONNREFUSED => e
         {
-          :code => -2,
-          :body => e.message,
-          :headers => {},
-          :secure => @ssl
+          code: -2,
+          body: e.message,
+          headers: {},
+          secure: @ssl
         }
       rescue Timeout::Error => e
         {
-          :code => -1,
-          :body => "Timed out after #{timeout}s",
-          :headers => {},
-          :secure => @ssl
+          code: -1,
+          body: "Timed out after #{timeout}s",
+          headers: {},
+          secure: @ssl
         }
       end
     end
-
   end
 end
-

@@ -1,6 +1,6 @@
 #!/usr/bin/env ruby
 
-require File.expand_path('../../lib/postal/config', __FILE__)
+require File.expand_path('../lib/postal/config', __dir__)
 worker_quantity = Postal.config.workers&.quantity || 1
 hash = {
   'root' => Postal.app_root.to_s,
@@ -15,4 +15,4 @@ hash = {
   }
 }.to_yaml
 
-File.open(Postal.app_root.join('Procfile.local'), 'w') { |f| f.write(hash + "\n")}
+File.open(Postal.app_root.join('Procfile.local'), 'w') { |f| f.write(hash + "\n") }

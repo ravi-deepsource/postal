@@ -13,22 +13,20 @@
 #
 
 class WebhookEvent < ApplicationRecord
-
-  EVENTS = [
-    'MessageSent',
-    'MessageDelayed',
-    'MessageDeliveryFailed',
-    'MessageHeld',
-    'MessageBounced',
-    'MessageLinkClicked',
-    'MessageLoaded',
-    'DomainDNSError',
-    'SendLimitApproaching',
-    'SendLimitExceeded'
-  ]
+  EVENTS = %w[
+    MessageSent
+    MessageDelayed
+    MessageDeliveryFailed
+    MessageHeld
+    MessageBounced
+    MessageLinkClicked
+    MessageLoaded
+    DomainDNSError
+    SendLimitApproaching
+    SendLimitExceeded
+  ].freeze
 
   belongs_to :webhook
 
-  validates :event, :presence => true
-
+  validates :event, presence: true
 end

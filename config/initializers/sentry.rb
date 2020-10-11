@@ -5,10 +5,8 @@ if Postal.config.general&.exception_url
   Raven.configure do |config|
     config.dsn = Postal.config.general.exception_url
     config.environments = ['production']
-    if ENV['DEV_EXCEPTIONS']
-      config.environments << 'development'
-    end
+    config.environments << 'development' if ENV['DEV_EXCEPTIONS']
     config.silence_ready = true
-    config.tags = {:process => ENV['PROC_NAME']}
+    config.tags = { process: ENV['PROC_NAME'] }
   end
 end

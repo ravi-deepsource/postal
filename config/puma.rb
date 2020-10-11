@@ -7,10 +7,6 @@ bind            "tcp://#{bind_address}:#{bind_port}"
 environment     Postal.config.rails&.environment || 'development'
 prune_bundler
 quiet false
-unless ENV['LOG_TO_STDOUT']
-  stdout_redirect Postal.log_root.join('puma.log'), Postal.log_root.join('puma.log'), true
-end
+stdout_redirect Postal.log_root.join('puma.log'), Postal.log_root.join('puma.log'), true unless ENV['LOG_TO_STDOUT']
 
-if ENV['APP_ROOT']
-  directory ENV['APP_ROOT']
-end
+directory ENV['APP_ROOT'] if ENV['APP_ROOT']

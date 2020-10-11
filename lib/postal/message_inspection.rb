@@ -4,11 +4,10 @@ require 'json'
 
 module Postal
   class MessageInspection
-
     SPAM_EXCLUSIONS = {
-      :outgoing => ['NO_RECEIVED', 'NO_RELAYS', 'ALL_TRUSTED', 'FREEMAIL_FORGED_REPLYTO', 'RDNS_DYNAMIC', 'CK_HELO_GENERIC', /^SPF\_/, /^HELO\_/, /DKIM_/, /^RCVD_IN_/],
-      :incoming => []
-    }
+      outgoing: ['NO_RECEIVED', 'NO_RELAYS', 'ALL_TRUSTED', 'FREEMAIL_FORGED_REPLYTO', 'RDNS_DYNAMIC', 'CK_HELO_GENERIC', /^SPF\_/, /^HELO\_/, /DKIM_/, /^RCVD_IN_/],
+      incoming: []
+    }.freeze
 
     def initialize(message, scope = :incoming)
       @message = message
@@ -17,22 +16,14 @@ module Postal
       @spam_score = 0.0
       @spam_checks = []
 
-      if Postal.config.spamd.enabled?
-        scan_for_spam
-      end
+      scan_for_spam if Postal.config.spamd.enabled?
 
-      if Postal.config.clamav.enabled?
-        scan_for_threats
-      end
+      scan_for_threats if Postal.config.clamav.enabled?
     end
 
-    def spam_score
-      @spam_score
-    end
+    attr_reader :spam_score
 
-    def spam_checks
-      @spam_checks
-    end
+    attr_reader :spam_checks
 
     def filtered_spam_checks
       @filtered_spam_checks ||= @spam_checks.reject do |check|
@@ -52,9 +43,7 @@ module Postal
       @threat
     end
 
-    def threat_message
-      @threat_message
-    end
+    attr_reader :threat_message
 
     private
 
@@ -75,24 +64,27 @@ module Postal
       rules = data ? data.split(/^---(.*)\r?\n/).last.split(/\r?\n/) : []
       while line = rules.shift
         if line =~ /\A([\- ]?[\d\.]+)\s+(\w+)\s+(.*)/
-          total += $1.to_f
-          spam_checks << SPAMCheck.new($2, $1.to_f, $3)
+          total += Regexp.last_match(1).to_f
+          spam_checks << SPAMCheck.new(Regexp.last_match(2), Regexp.last_match(1).to_f, Regexp.last_match(3))
         else
-          spam_checks.last.description << " " + line.strip
+          spam_checks.last.description << ' ' + line.strip
         end
       end
 
       @spam_score = total.round(1)
       @spam_checks = spam_checks
-
     rescue Timeout::Error
-      @spam_checks = [SPAMCheck.new("TIMEOUT", 0, "Timed out when scanning for spam")]
-    rescue => e
+      @spam_checks = [SPAMCheck.new('TIMEOUT', 0, 'Timed out when scanning for spam')]
+    rescue StandardError => e
       logger.error "Error talking to spamd: #{e.class} (#{e.message})"
-      logger.error e.backtrace[0,5]
-      @spam_checks = [SPAMCheck.new("ERROR", 0, "Error when scanning for spam")]
+      logger.error e.backtrace[0, 5]
+      @spam_checks = [SPAMCheck.new('ERROR', 0, 'Error when scanning for spam')]
     ensure
-      tcp_socket.close rescue nil
+      begin
+        tcp_socket.close
+      rescue StandardError
+        nil
+      end
     end
 
     def scan_for_threats
@@ -102,40 +94,43 @@ module Postal
       Timeout.timeout(10) do
         tcp_socket = TCPSocket.new(Postal.config.clamav.host, Postal.config.clamav.port)
         tcp_socket.write("zINSTREAM\0")
-        tcp_socket.write([@message.bytesize].pack("N"))
+        tcp_socket.write([@message.bytesize].pack('N'))
         tcp_socket.write(@message)
-        tcp_socket.write([0].pack("N"))
+        tcp_socket.write([0].pack('N'))
         tcp_socket.close_write
         data = tcp_socket.read
       end
 
       if data && data =~ /\Astream\:\s+(.*?)[\s\0]+?/
-        if $1.upcase == 'OK'
+        if Regexp.last_match(1).upcase == 'OK'
           @threat = false
-          @threat_message = "No threats found"
+          @threat_message = 'No threats found'
         else
           @threat = true
-          @threat_message = $1
+          @threat_message = Regexp.last_match(1)
         end
       else
         @threat = false
-        @threat_message = "Could not scan message"
+        @threat_message = 'Could not scan message'
       end
     rescue Timeout::Error
       @threat = false
-      @threat_message = "Timed out scanning for threats"
-    rescue => e
+      @threat_message = 'Timed out scanning for threats'
+    rescue StandardError => e
       logger.error "Error talking to clamav: #{e.class} (#{e.message})"
-      logger.error e.backtrace[0,5]
+      logger.error e.backtrace[0, 5]
       @threat = false
-      @threat_message = "Error when scanning for threats"
+      @threat_message = 'Error when scanning for threats'
     ensure
-      tcp_socket.close rescue nil
+      begin
+        tcp_socket.close
+      rescue StandardError
+        nil
+      end
     end
 
     def logger
       Postal.logger_for(:message_inspection)
     end
-
   end
 end

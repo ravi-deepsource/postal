@@ -9,9 +9,7 @@
 #
 
 class Statistic < ApplicationRecord
-
   def self.global
     Statistic.first || Statistic.create
   end
-
 end

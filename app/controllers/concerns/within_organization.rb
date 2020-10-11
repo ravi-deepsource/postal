@@ -1,5 +1,4 @@
 module WithinOrganization
-
   extend ActiveSupport::Concern
 
   included do
@@ -16,5 +15,4 @@ module WithinOrganization
   def add_organization_to_page_title
     page_title << organization.name
   end
-
 end

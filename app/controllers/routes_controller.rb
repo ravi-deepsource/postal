@@ -1,5 +1,4 @@
 class RoutesController < ApplicationController
-
   include WithinOrganization
 
   before_action { @server = organization.servers.present.find_by_permalink!(params[:server_id]) }
@@ -38,7 +37,6 @@ class RoutesController < ApplicationController
   private
 
   def safe_params
-    params.require(:route).permit(:name, :domain_id, :spam_mode, :_endpoint, :additional_route_endpoints_array => [])
+    params.require(:route).permit(:name, :domain_id, :spam_mode, :_endpoint, additional_route_endpoints_array: [])
   end
-
 end

@@ -1,13 +1,12 @@
 module Postal
   module MessageDB
     class Statistics
-
       def initialize(database)
         @database = database
       end
 
-      STATS_GAPS = {:hourly => :hour, :daily => :day, :monthly => :month, :yearly => :year}
-      COUNTERS = [:incoming, :outgoing, :spam, :bounces, :held]
+      STATS_GAPS = { hourly: :hour, daily: :day, monthly: :month, yearly: :year }.freeze
+      COUNTERS = %i[incoming outgoing spam bounces held].freeze
 
       #
       # Increment an appropriate counter
@@ -44,7 +43,7 @@ module Postal
             h[c] = 0
           end
         end
-        @database.select("stats_#{type}", :where => {:time => items.keys.map(&:to_i)}, :fields => [:time] | counters).each do |data|
+        @database.select("stats_#{type}", where: { time: items.keys.map(&:to_i) }, fields: [:time] | counters).each do |data|
           time = Time.zone.at(data.delete('time'))
           data.each do |key, value|
             items[time][key.to_sym] = value
@@ -52,7 +51,6 @@ module Postal
         end
         items.to_a.reverse
       end
-
     end
   end
 end

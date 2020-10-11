@@ -1,5 +1,4 @@
 class AddressEndpointsController < ApplicationController
-
   include WithinOrganization
 
   before_action { @server = organization.servers.present.find_by_permalink!(params[:server_id]) }
@@ -41,5 +40,4 @@ class AddressEndpointsController < ApplicationController
   def safe_params
     params.require(:address_endpoint).permit(:address)
   end
-
 end

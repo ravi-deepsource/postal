@@ -1,15 +1,14 @@
 class SendWebhookJob < Postal::Job
-
   def perform
     if server = Server.find(params['server_id'])
       new_items = {}
       if params['payload']
-        for key, value in params['payload']
-          if key.to_s =~ /\A\_(\w+)/
-            begin
-              new_items[$1] = server.message_db.message(value.to_i).webhook_hash
-            rescue Postal::MessageDB::Message::NotFound
-            end
+        params['payload'].each do |key, value|
+          next unless key.to_s =~ /\A\_(\w+)/
+
+          begin
+            new_items[Regexp.last_match(1)] = server.message_db.message(value.to_i).webhook_hash
+          rescue Postal::MessageDB::Message::NotFound
           end
         end
       end
@@ -24,5 +23,4 @@ class SendWebhookJob < Postal::Job
       log "Couldn't find server with ID #{params['server_id']}"
     end
   end
-
 end

@@ -14,10 +14,9 @@
 #
 
 class IPPoolRule < ApplicationRecord
-
   include HasUUID
 
-  belongs_to :owner, :polymorphic => true
+  belongs_to :owner, polymorphic: true
   belongs_to :ip_pool
 
   validate :validate_from_and_to_addresses
@@ -34,17 +33,13 @@ class IPPoolRule < ApplicationRecord
   def apply_to_message?(message)
     if from.present? && message.headers['from'].present?
       from.each do |condition|
-        if message.headers['from'].any? { |f| self.class.address_matches?(condition, f) }
-          return true
-        end
+        return true if message.headers['from'].any? { |f| self.class.address_matches?(condition, f) }
       end
     end
 
     if to.present? && message.rcpt_to.present?
       to.each do |condition|
-        if self.class.address_matches?(condition, message.rcpt_to)
-          return true
-        end
+        return true if self.class.address_matches?(condition, message.rcpt_to)
       end
     end
 
@@ -54,15 +49,13 @@ class IPPoolRule < ApplicationRecord
   private
 
   def validate_from_and_to_addresses
-    if self.from.empty? && self.to.empty?
-      errors.add :base, "At least one rule condition must be specified"
-    end
+    errors.add :base, 'At least one rule condition must be specified' if from.empty? && to.empty?
   end
 
   def validate_ip_pool_belongs_to_organization
-    org = self.owner.is_a?(Organization) ? self.owner : self.owner.organization
-    if self.ip_pool && self.ip_pool_id_changed? && !org.ip_pools.include?(self.ip_pool)
-      errors.add :ip_pool_id, "must belong to the organization"
+    org = owner.is_a?(Organization) ? owner : owner.organization
+    if ip_pool && ip_pool_id_changed? && !org.ip_pools.include?(ip_pool)
+      errors.add :ip_pool_id, 'must belong to the organization'
     end
   end
 
@@ -70,13 +63,13 @@ class IPPoolRule < ApplicationRecord
     address = Postal::Helpers.strip_name_from_address(address)
     if condition =~ /@/
       parts = address.split('@')
-      domain, uname = parts.pop, parts.join('@')
-      uname, _ = uname.split('+', 2)
+      domain = parts.pop
+      uname = parts.join('@')
+      uname, = uname.split('+', 2)
       condition == "#{uname}@#{domain}"
     else
       # Match as a domain
       condition == address.split('@').last
     end
   end
-
 end

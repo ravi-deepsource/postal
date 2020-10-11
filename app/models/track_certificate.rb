@@ -20,49 +20,48 @@
 #
 
 class TrackCertificate < ApplicationRecord
-
-  validates :domain, :presence => true, :uniqueness => true
+  validates :domain, presence: true, uniqueness: true
 
   default_value :key, -> { OpenSSL::PKey::RSA.new(2048).to_s }
 
-  scope :active, -> { where("certificate IS NOT NULL AND expires_at > ?", Time.now) }
+  scope :active, -> { where('certificate IS NOT NULL AND expires_at > ?', Time.now) }
 
   def active?
     certificate.present?
   end
 
   def get
-    order = Postal::LetsEncrypt.client.new_order(identifiers: [self.domain])
+    order = Postal::LetsEncrypt.client.new_order(identifiers: [domain])
     authorization = order.authorizations.first
     challenge = authorization.http
     self.verification_path = challenge.filename
     self.verification_string = challenge.file_content
-    self.save!
-    logger.info "Attempting verification of #{self.domain}"
+    save!
+    logger.info "Attempting verification of #{domain}"
     challenge.request_validation
     checks = 0
-    until challenge.status != "pending"
+    until challenge.status != 'pending'
       checks += 1
       if checks > 30
-        logger.info "Status remained at pending for 30 checks"
+        logger.info 'Status remained at pending for 30 checks'
         return false
       end
       sleep 1
       challenge.reload
     end
 
-    unless challenge.status == "valid"
+    unless challenge.status == 'valid'
       logger.info "Status was not valid (was: #{challenge.status})"
       return false
     end
 
     csr = OpenSSL::X509::Request.new
-    csr.subject = OpenSSL::X509::Name.new([['CN', self.domain, OpenSSL::ASN1::UTF8STRING]])
-    private_key = OpenSSL::PKey::RSA.new(self.key)
+    csr.subject = OpenSSL::X509::Name.new([['CN', domain, OpenSSL::ASN1::UTF8STRING]])
+    private_key = OpenSSL::PKey::RSA.new(key)
     csr.public_key = private_key.public_key
     csr.sign(private_key, OpenSSL::Digest::SHA256.new)
-    logger.info "Getting certificate for #{self.domain}"
-    order.finalize(:csr => csr)
+    logger.info "Getting certificate for #{domain}"
+    order.finalize(csr: csr)
 
     sleep(1) while order.status == 'processing'
     https_cert = order.certificate # => PEM-formatted certificate
@@ -71,11 +70,10 @@ class TrackCertificate < ApplicationRecord
     self.certificate = cert
     self.intermediaries = chain
     self.expires_at = certificate_object.not_after
-    self.renew_after = (self.expires_at - 1.month) + rand(10).days
-    self.save!
-    logger.info "Certificate issued (expires on #{self.expires_at}, will renew after #{self.renew_after})"
-    return true
-
+    self.renew_after = (expires_at - 1.month) + rand(10).days
+    save!
+    logger.info "Certificate issued (expires on #{expires_at}, will renew after #{renew_after})"
+    true
   rescue Acme::Client::Error => e
     @retries = 0
     if e.is_a?(Acme::Client::Error::BadNonce) && @retries < 5
@@ -85,24 +83,23 @@ class TrackCertificate < ApplicationRecord
       verify
     else
       logger.info "Error: #{e.class} (#{e.message})"
-      return false
+      false
     end
   end
 
   def certificate_object
-    OpenSSL::X509::Certificate.new(self.certificate)
+    OpenSSL::X509::Certificate.new(certificate)
   end
 
   def intermediaries_array
-    self.intermediaries.to_s.scan(/-----BEGIN CERTIFICATE-----.+?-----END CERTIFICATE-----/m).map{|c| OpenSSL::X509::Certificate.new(c)}
+    intermediaries.to_s.scan(/-----BEGIN CERTIFICATE-----.+?-----END CERTIFICATE-----/m).map { |c| OpenSSL::X509::Certificate.new(c) }
   end
 
   def key_object
-    OpenSSL::PKey::RSA.new(self.key)
+    OpenSSL::PKey::RSA.new(key)
   end
 
   def logger
     Postal::LetsEncrypt.logger
   end
-
 end

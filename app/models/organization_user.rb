@@ -12,9 +12,8 @@
 #
 
 class OrganizationUser < ApplicationRecord
-
   belongs_to :organization
-  belongs_to :user, :polymorphic => true, :optional => true
+  belongs_to :user, polymorphic: true, optional: true
 
   validate :validate_uniqueness
 
@@ -25,13 +24,11 @@ class OrganizationUser < ApplicationRecord
     @email_address ||= user&.email_address
   end
 
-  def email_address=(value)
-    @email_address = value
-  end
+  attr_writer :email_address
 
   def create_user_invite
-    if self.user.nil?
-      user = UserInvite.where(:email_address => @email_address).first_or_initialize
+    if user.nil?
+      user = UserInvite.where(email_address: @email_address).first_or_initialize
       if user.save
         self.user = user
       else
@@ -42,17 +39,14 @@ class OrganizationUser < ApplicationRecord
   end
 
   def validate_uniqueness
-    if self.email_address.present?
-      if organization.organization_users.where.not(:id => self.id).any? { |ou| ou.user.email_address.upcase == self.email_address.upcase }
-        errors.add :email_address, "is already assigned or has an pending invite"
+    if email_address.present?
+      if organization.organization_users.where.not(id: id).any? { |ou| ou.user.email_address.upcase == email_address.upcase }
+        errors.add :email_address, 'is already assigned or has an pending invite'
       end
     end
   end
 
   def remove_user_invites
-    if self.user.is_a?(UserInvite) && self.user.organizations.empty?
-      self.user.destroy
-    end
+    user.destroy if user.is_a?(UserInvite) && user.organizations.empty?
   end
-
 end

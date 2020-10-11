@@ -11,14 +11,14 @@ require 'rubygems'
 require 'pathname'
 require 'fileutils'
 
-ROOT = Pathname.new(File.expand_path('../../', __FILE__))
-BUILD_ROOT = Pathname.new("/tmp/postal-build")
+ROOT = Pathname.new(File.expand_path('..', __dir__))
+BUILD_ROOT = Pathname.new('/tmp/postal-build')
 WC_PATH = BUILD_ROOT.join('wc')
 PACKAGE_PATH = BUILD_ROOT.join('package.tgz')
 CHANNEL = ARGV[0]
 
-unless ['beta', 'stable'].include?(CHANNEL)
-  puts "channel must be beta or stable"
+unless %w[beta stable].include?(CHANNEL)
+  puts 'channel must be beta or stable'
   exit 1
 end
 
@@ -48,7 +48,7 @@ puts "\e[44;37mInstalling configuration\e[0m"
 system!("cd #{WC_PATH} && ./bin/postal initialize-config")
 
 # Get the last commit reference for the version file
-last_commit = `git -C #{WC_PATH} log --pretty=oneline -n 1`.split(/\s+/, 2).first[0,10]
+last_commit = `git -C #{WC_PATH} log --pretty=oneline -n 1`.split(/\s+/, 2).first[0, 10]
 puts "\e[34mGot latest commit was #{last_commit}\e[0m"
 
 # Read the version file for the version number so we it put it in the build
@@ -56,13 +56,13 @@ puts "\e[34mGot latest commit was #{last_commit}\e[0m"
 # CHANNEL for this build.
 version_file = File.read("#{WC_PATH}/lib/postal/version.rb")
 if version_file =~ /VERSION = '(.*)'/
-  version = $1.to_s
+  version = Regexp.last_match(1).to_s
   puts "\e[34mGot version as #{version}\e[0m"
 else
-  puts "Could not determine version from version file"
+  puts 'Could not determine version from version file'
   exit 1
 end
-version_file.gsub!("REVISION = nil", "REVISION = '#{last_commit}'")
+version_file.gsub!('REVISION = nil', "REVISION = '#{last_commit}'")
 version_file.gsub!("CHANNEL = 'dev'", "CHANNEL = '#{CHANNEL}'")
 File.open("#{WC_PATH}/lib/postal/version.rb", 'w') { |f| f.write(version_file) }
 
@@ -96,11 +96,11 @@ filename = "postal-#{version}-#{last_commit}.tgz"
 # for the appropriate channel.
 require 'net/ssh'
 require 'net/scp'
-Net::SSH.start("postal.atech.media") do |ssh|
+Net::SSH.start('postal.atech.media') do |ssh|
   ssh.exec!("rm -Rf /home/atechmedia/postal.atech.media/packages/#{CHANNEL}/#{filename}")
-  puts "Uploading..."
+  puts 'Uploading...'
   ssh.scp.upload!(PACKAGE_PATH.to_s, "/home/atechmedia/postal.atech.media/packages/#{CHANNEL}/#{filename}")
-  puts "Making latest..."
+  puts 'Making latest...'
   ssh.exec!("rm -Rf /home/atechmedia/postal.atech.media/packages/#{CHANNEL}/latest.tgz")
   ssh.exec!("ln -s /home/atechmedia/postal.atech.media/packages/#{CHANNEL}/#{filename} /home/atechmedia/postal.atech.media/packages/#{CHANNEL}/latest.tgz")
 end
