@@ -1,5 +1,4 @@
 class IPAddressesController < ApplicationController
-
   before_action :admin_required
   before_action { @ip_pool = IPPool.find_by_uuid!(params[:ip_pool_id]) }
   before_action { params[:id] && @ip_address = @ip_pool.ip_addresses.find(params[:id]) }
@@ -35,5 +34,4 @@ class IPAddressesController < ApplicationController
   def safe_params
     params.require(:ip_address).permit(:ipv4, :ipv6, :hostname)
   end
-
 end

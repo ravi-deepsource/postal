@@ -1,7 +1,6 @@
 module Postal
   module MessageDB
     class Load
-
       def initialize(attributes)
         @ip_address = attributes['ip_address']
         @user_agent = attributes['user_agent']
@@ -11,7 +10,6 @@ module Postal
       attr_reader :ip_address
       attr_reader :user_agent
       attr_reader :timestamp
-
     end
   end
 end

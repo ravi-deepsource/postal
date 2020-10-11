@@ -1,11 +1,10 @@
 module HasMessage
-
   def self.included(base)
     base.extend ClassMethods
   end
 
   def message
-    @message ||= self.server.message_db.message(self.message_id)
+    @message ||= server.message_db.message(message_id)
   end
 
   def message=(message)
@@ -22,9 +21,10 @@ module HasMessage
       elsif server_ids.size > 1
         raise Postal::Error, "'include_message' can only be used on collections of messages from the same server"
       end
+
       message_ids = queued_messages.map(&:message_id).uniq
       server = queued_messages.first&.server
-      messages = server.message_db.messages(:where => {:id => message_ids}).each_with_object({}) do |message, hash|
+      messages = server.message_db.messages(where: { id: message_ids }).each_with_object({}) do |message, hash|
         hash[message.id] = message
       end
       queued_messages.each do |queued_message|
@@ -34,5 +34,4 @@ module HasMessage
       end
     end
   end
-
 end

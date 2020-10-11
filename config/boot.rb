@@ -10,7 +10,4 @@ Postal.check_config!
 
 ENV['DATABASE_URL'] = Postal.database_url
 ENV['RAILS_ENV'] = Postal.config.rails&.environment || 'development'
-if ENV['PROC_NAME']
-  $0="[postal] #{ENV['PROC_NAME']}"
-end
-
+$0 = "[postal] #{ENV['PROC_NAME']}" if ENV['PROC_NAME']

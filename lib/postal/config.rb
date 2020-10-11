@@ -7,13 +7,12 @@ require_relative 'error'
 require_relative 'version'
 
 module Postal
-
   def self.host
-    @host ||= config.web.host || "localhost:5000"
+    @host ||= config.web.host || 'localhost:5000'
   end
 
   def self.protocol
-    @protocol ||= config.web.protocol || "http"
+    @protocol ||= config.web.protocol || 'http'
   end
 
   def self.host_with_protocol
@@ -21,25 +20,25 @@ module Postal
   end
 
   def self.app_root
-    @app_root ||= Pathname.new(File.expand_path('../../../', __FILE__))
+    @app_root ||= Pathname.new(File.expand_path('../..', __dir__))
   end
 
   def self.config
     @config ||= begin
       require 'hashie/mash'
-      config = Hashie::Mash.new(self.defaults)
-      config.deep_merge(self.yaml_config)
+      config = Hashie::Mash.new(defaults)
+      config.deep_merge(yaml_config)
     end
   end
 
   def self.config_root
     @config_root ||= begin
-      if __FILE__ =~ /\A\/opt\/postal/
-        Pathname.new("/opt/postal/config")
+      if __FILE__ =~ %r{\A/opt/postal}
+        Pathname.new('/opt/postal/config')
       elsif ENV['POSTAL_CONFIG_ROOT']
         Pathname.new(ENV['POSTAL_CONFIG_ROOT'])
       else
-        Pathname.new(File.expand_path("../../../config", __FILE__))
+        Pathname.new(File.expand_path('../../config', __dir__))
       end
     end
   end
@@ -48,8 +47,8 @@ module Postal
     @log_root ||= begin
       if config.logging.root
         Pathname.new(config.logging.root)
-      elsif __FILE__ =~ /\/opt\/postal/
-        Pathname.new("/opt/postal/log")
+      elsif __FILE__ =~ %r{/opt/postal}
+        Pathname.new('/opt/postal/log')
       else
         app_root.join('log')
       end
@@ -69,14 +68,14 @@ module Postal
   end
 
   def self.defaults
-    @defaults ||= YAML.load_file(self.defaults_file_path)
+    @defaults ||= YAML.load_file(defaults_file_path)
   end
 
   def self.database_url
     if config.main_db
       "mysql2://#{CGI.escape(config.main_db.username.to_s)}:#{CGI.escape(config.main_db.password.to_s)}@#{config.main_db.host}:#{config.main_db.port}/#{config.main_db.database}?reconnect=true&encoding=#{config.main_db.encoding || 'utf8mb4'}&pool=#{config.main_db.pool_size}"
     else
-      "mysql2://root@localhost/postal"
+      'mysql2://root@localhost/postal'
     end
   end
 
@@ -98,8 +97,8 @@ module Postal
       string = "host:#{Socket.gethostname} pid:#{Process.pid}"
       string += " procname:#{ENV['PROC_NAME']}" if ENV['PROC_NAME']
       string
-    rescue
-      "pid:#{Process.pid}"
+                      rescue StandardError
+                        "pid:#{Process.pid}"
     end
   end
 
@@ -110,11 +109,11 @@ module Postal
   end
 
   def self.smtp_from_name
-    config.smtp&.from_name || "Postal"
+    config.smtp&.from_name || 'Postal'
   end
 
   def self.smtp_from_address
-    config.smtp&.from_address || "postal@example.com"
+    config.smtp&.from_address || 'postal@example.com'
   end
 
   def self.smtp_private_key_path
@@ -135,7 +134,7 @@ module Postal
 
   def self.smtp_certificates
     @smtp_certificates ||= begin
-      certs = self.smtp_certificate_data.scan(/-----BEGIN CERTIFICATE-----.+?-----END CERTIFICATE-----/m)
+      certs = smtp_certificate_data.scan(/-----BEGIN CERTIFICATE-----.+?-----END CERTIFICATE-----/m)
       certs.map do |c|
         OpenSSL::X509::Certificate.new(c)
       end.freeze
@@ -160,7 +159,7 @@ module Postal
 
   def self.fast_server_default_certificates
     @fast_server_default_certificates ||= begin
-      certs = self.fast_server_default_certificate_data.scan(/-----BEGIN CERTIFICATE-----.+?-----END CERTIFICATE-----/m)
+      certs = fast_server_default_certificate_data.scan(/-----BEGIN CERTIFICATE-----.+?-----END CERTIFICATE-----/m)
       certs.map do |c|
         OpenSSL::X509::Certificate.new(c)
       end.freeze
@@ -190,25 +189,20 @@ module Postal
   def self.check_config!
     return if ENV['POSTAL_SKIP_CONFIG_CHECK'].to_i == 1
 
-    unless File.exist?(self.config_file_path)
-      raise ConfigError, "No config found at #{self.config_file_path}"
+    raise ConfigError, "No config found at #{config_file_path}" unless File.exist?(config_file_path)
+
+    unless File.exist?(lets_encrypt_private_key_path)
+      raise ConfigError, "No Let's Encrypt private key found at #{lets_encrypt_private_key_path}"
     end
 
-    unless File.exists?(self.lets_encrypt_private_key_path)
-      raise ConfigError, "No Let's Encrypt private key found at #{self.lets_encrypt_private_key_path}"
-    end
-
-    unless File.exists?(self.signing_key_path)
-      raise ConfigError, "No signing key found at #{self.signing_key_path}"
-    end
+    raise ConfigError, "No signing key found at #{signing_key_path}" unless File.exist?(signing_key_path)
   end
 
   def self.tracking_available?
-    self.config.fast_server.enabled?
+    config.fast_server.enabled?
   end
 
   def self.ip_pools?
-    self.config.general.use_ip_pools?
+    config.general.use_ip_pools?
   end
-
 end

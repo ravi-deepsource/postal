@@ -1,9 +1,8 @@
 #!/usr/bin/env ruby
-trap("INT") { puts ; exit }
-
+trap('INT') { puts; exit }
 
 if ARGV[0].nil? || !(ARGV[0] =~ /@/)
-  puts "usage: postal test-app-smtp [email address]"
+  puts 'usage: postal test-app-smtp [email address]'
   exit 1
 end
 
@@ -15,7 +14,7 @@ begin
   end
 
   puts "\e[32mMessage has been sent successfully.\e[0m"
-rescue => e
+rescue StandardError => e
   puts "\e[31mMessage was not delivered successfully to SMTP server.\e[0m"
   puts "Error: #{e.class} (#{e.message})"
   puts
@@ -25,5 +24,5 @@ rescue => e
   puts "  SMTP Password: #{Postal.config.smtp.password}"
   puts
 rescue Timeout::Error
-  puts "Sending timed out"
+  puts 'Sending timed out'
 end

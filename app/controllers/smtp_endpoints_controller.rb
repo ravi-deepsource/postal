@@ -39,5 +39,4 @@ class SMTPEndpointsController < ApplicationController
   def safe_params
     params.require(:smtp_endpoint).permit(:name, :hostname, :port, :ssl_mode)
   end
-
 end

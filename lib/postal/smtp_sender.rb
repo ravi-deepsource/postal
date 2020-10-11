@@ -2,7 +2,6 @@ require 'resolv'
 
 module Postal
   class SMTPSender < Sender
-
     def initialize(domain, source_ip_address, options = {})
       @domain = domain
       @source_ip_address = source_ip_address
@@ -10,7 +9,7 @@ module Postal
       @smtp_client = nil
       @connection_errors = []
       @hostnames = []
-      @log_id = Nifty::Utils::RandomString.generate(:length => 8).upcase
+      @log_id = Nifty::Utils::RandomString.generate(length: 8).upcase
     end
 
     def start
@@ -30,8 +29,7 @@ module Postal
         end
 
         @hostnames << hostname
-        [:aaaa, :a].each do |ip_type|
-
+        %i[aaaa a].each do |ip_type|
           if @source_ip_address && @source_ip_address.ipv6.blank? && ip_type == :aaaa
             # Don't try to use IPv6 if the IP address we're sending from doesn't support it.
             next
@@ -65,10 +63,14 @@ module Postal
             end
             smtp_client.start(@source_ip_address ? @source_ip_address.hostname : self.class.default_helo_hostname)
             log "Connected to #{@remote_ip}:#{port} (#{hostname})"
-          rescue => e
+          rescue StandardError => e
             log "Cannot connect to #{@remote_ip}:#{port} (#{hostname}) (#{e.class}: #{e.message})"
             @connection_errors << e.message unless @connection_errors.include?(e.message)
-            smtp_client.disconnect rescue nil
+            begin
+              smtp_client.disconnect
+            rescue StandardError
+              nil
+            end
             smtp_client = nil
           end
 
@@ -83,18 +85,25 @@ module Postal
     end
 
     def reconnect
-      log "Reconnecting"
-      @smtp_client&.finish rescue nil
+      log 'Reconnecting'
+      begin
+        @smtp_client&.finish
+      rescue StandardError
+        nil
+      end
       start
     end
 
     def safe_rset
       # Something went wrong sending the last email. Reset the connection if possible, else disconnect.
+
+      @smtp_client.rset
+    rescue StandardError
+      # Don't reconnect, this would be rather rude if we don't have any more emails to send.
       begin
-        @smtp_client.rset
-      rescue
-        # Don't reconnect, this would be rather rude if we don't have any more emails to send.
-        @smtp_client.finish rescue nil
+        @smtp_client.finish
+      rescue StandardError
+        nil
       end
     end
 
@@ -108,18 +117,16 @@ module Postal
         start
       end
 
-      if @smtp_client
-        result.secure = @smtp_client.secure_socket?
-      end
+      result.secure = @smtp_client.secure_socket? if @smtp_client
 
       begin
-        if message.bounce == 1
-          mail_from = ""
-        elsif message.domain.return_path_status == 'OK'
-          mail_from = "#{message.server.token}@#{message.domain.return_path_domain}"
-        else
-          mail_from = "#{message.server.token}@#{Postal.config.dns.return_path}"
-        end
+        mail_from = if message.bounce == 1
+                      ''
+                    elsif message.domain.return_path_status == 'OK'
+                      "#{message.server.token}@#{message.domain.return_path_domain}"
+                    else
+                      "#{message.server.token}@#{Postal.config.dns.return_path}"
+                    end
         raw_message = "Resent-Sender: #{mail_from}\r\n" + message.raw_message
         tries = 0
         begin
@@ -149,12 +156,9 @@ module Postal
         end
         result.type = 'Sent'
         result.details = "Message for #{rcpt_to} accepted by #{destination_host_description}"
-        if @smtp_client.source_address
-          result.details += " (from #{@smtp_client.source_address})"
-        end
+        result.details += " (from #{@smtp_client.source_address})" if @smtp_client.source_address
         result.output = smtp_result.string
         log "Message sent ##{message.id} to #{destination_host_description} for #{rcpt_to}"
-
       rescue Net::SMTPServerBusy, Net::SMTPAuthenticationError, Net::SMTPSyntaxError, Net::SMTPUnknownError, Net::ReadTimeout => e
         log "#{e.class}: #{e.message}"
         result.type = 'SoftFail'
@@ -162,9 +166,9 @@ module Postal
         result.details = "Temporary SMTP delivery error when sending to #{destination_host_description}"
         result.output = e.message
         if e.to_s =~ /(\d+) seconds/
-          result.retry = $1.to_i + 10
+          result.retry = Regexp.last_match(1).to_i + 10
         elsif e.to_s =~ /(\d+) minutes/
-          result.retry = ($1.to_i * 60) + 10
+          result.retry = (Regexp.last_match(1).to_i * 60) + 10
         end
 
         safe_rset
@@ -174,10 +178,10 @@ module Postal
         result.details = "Permanent SMTP delivery error when sending to #{destination_host_description}"
         result.output = e.message
         safe_rset
-      rescue => e
+      rescue StandardError => e
         log "#{e.class}: #{e.message}"
         if defined?(Raven)
-          Raven.capture_exception(e, :extra => {:log_id => @log_id, :server_id => message.server.id, :message_id => message.id})
+          Raven.capture_exception(e, extra: { log_id: @log_id, server_id: message.server.id, message_id: message.id })
         end
         result.type = 'SoftFail'
         result.retry = true
@@ -187,12 +191,11 @@ module Postal
       end
 
       result.time = (Time.now - start_time).to_f.round(2)
-      return result
-    ensure
+      result
     end
 
     def finish
-      log "Finishing up"
+      log 'Finishing up'
       @smtp_client&.finish
     end
 
@@ -202,8 +205,8 @@ module Postal
       @options[:servers] || self.class.relay_hosts || @servers ||= begin
         mx_servers = []
         Resolv::DNS.open do |dns|
-          dns.timeouts = [10,5]
-          mx_servers = dns.getresources(@domain, Resolv::DNS::Resource::IN::MX).map { |m| [m.preference.to_i, m.exchange.to_s] }.sort.map{ |m| m[1] }
+          dns.timeouts = [10, 5]
+          mx_servers = dns.getresources(@domain, Resolv::DNS::Resource::IN::MX).map { |m| [m.preference.to_i, m.exchange.to_s] }.sort.map { |m| m[1] }
           if mx_servers.empty?
             mx_servers = [@domain] # This will be resolved to an A or AAAA record later
           end
@@ -223,7 +226,7 @@ module Postal
     def lookup_ip_address(type, hostname)
       records = []
       Resolv::DNS.open do |dns|
-        dns.timeouts = [10,5]
+        dns.timeouts = [10, 5]
         case type
         when :a
           records = dns.getresources(hostname, Resolv::DNS::Resource::IN::A)
@@ -253,23 +256,20 @@ module Postal
     end
 
     def self.default_helo_hostname
-      Postal.config.dns.helo_hostname || Postal.config.dns.smtp_server_hostname || "localhost"
+      Postal.config.dns.helo_hostname || Postal.config.dns.smtp_server_hostname || 'localhost'
     end
 
     def self.relay_hosts
       hosts = Postal.config.smtp_relays.map do |relay|
-        if relay.hostname.present?
-          {
-            :hostname => relay.hostname,
-            :port => relay.port,
-            :ssl_mode => relay.ssl_mode
-          }
-        else
-          nil
-        end
+        next unless relay.hostname.present?
+
+        {
+          hostname: relay.hostname,
+          port: relay.port,
+          ssl_mode: relay.ssl_mode
+        }
       end.compact
       hosts.empty? ? nil : hosts
     end
-
   end
 end

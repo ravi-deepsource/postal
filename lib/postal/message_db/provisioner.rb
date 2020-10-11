@@ -1,7 +1,6 @@
 module Postal
   module MessageDB
     class Provisioner
-
       def initialize(database)
         @database = database
       end
@@ -68,9 +67,9 @@ module Postal
       # environment and can be quite dangerous in production.
       #
       def clean
-        ['clicks', 'deliveries', 'links', 'live_stats', 'loads', 'messages',
-          'raw_message_sizes', 'spam_checks', 'stats_daily', 'stats_hourly',
-          'stats_monthly', 'stats_yearly', 'suppressions', 'webhook_requests'].each do |table|
+        %w[clicks deliveries links live_stats loads messages
+           raw_message_sizes spam_checks stats_daily stats_hourly
+           stats_monthly stats_yearly suppressions webhook_requests].each do |table|
           @database.query("TRUNCATE `#{@database.database_name}`.`#{table}`")
         end
       end
@@ -79,18 +78,15 @@ module Postal
       # Creates a new empty raw message table for the given date. Returns nothing.
       #
       def create_raw_table(table)
-        begin
-          @database.query(create_table_query(table,:columns => {
-              :id   =>  'int(11) NOT NULL AUTO_INCREMENT',
-              :data =>  'longblob DEFAULT NULL',
-              :next =>  'int(11) DEFAULT NULL'
-            }
-          ))
-          @database.query("INSERT INTO `#{@database.database_name}`.`raw_message_sizes` (table_name, size) VALUES ('#{table}', 0)")
-        rescue Mysql2::Error => e
-          # Don't worry if the table already exists, another thread has already run this code.
-          raise unless e.message =~ /already exists/
-        end
+        @database.query(create_table_query(table, columns: {
+                                             id: 'int(11) NOT NULL AUTO_INCREMENT',
+                                             data: 'longblob DEFAULT NULL',
+                                             next: 'int(11) DEFAULT NULL'
+                                           }))
+        @database.query("INSERT INTO `#{@database.database_name}`.`raw_message_sizes` (table_name, size) VALUES ('#{table}', 0)")
+      rescue Mysql2::Error => e
+        # Don't worry if the table already exists, another thread has already run this code.
+        raise unless e.message =~ /already exists/
       end
 
       #
@@ -102,9 +98,7 @@ module Postal
           @database.query("SHOW TABLES FROM `#{@database.database_name}` LIKE 'raw-%'").each do |tbl|
             tbl_name = tbl.to_a.first.last
             date = Date.parse(tbl_name.gsub(/\Araw\-/, ''))
-            if earliest_date.nil? || date < earliest_date
-              tables << tbl_name
-            end
+            tables << tbl_name if earliest_date.nil? || date < earliest_date
           end
         end.sort
       end
@@ -128,11 +122,11 @@ module Postal
       end
 
       #
-      # Remove messages from the messages table that are too old to retain
+      #  Remove messages from the messages table that are too old to retain
       #
       def remove_messages(max_age = 60)
         time = (Date.today - max_age.days).to_time.end_of_day
-        if newest_message_to_remove = @database.select(:messages, :where => {:timestamp => {:less_than_or_equal_to => time.to_f}}, :limit => 1, :order => :id, :direction => 'DESC', :fields => [:id]).first
+        if newest_message_to_remove = @database.select(:messages, where: { timestamp: { less_than_or_equal_to: time.to_f } }, limit: 1, order: :id, direction: 'DESC', fields: [:id]).first
           id = newest_message_to_remove['id']
           @database.query("DELETE FROM `#{@database.database_name}`.`clicks` WHERE `message_id` <= #{id}")
           @database.query("DELETE FROM `#{@database.database_name}`.`loads` WHERE `message_id` <= #{id}")
@@ -146,7 +140,7 @@ module Postal
       # Remove raw message tables in order order until size is under the given size (given in MB)
       #
       def remove_raw_tables_until_less_than_size(size)
-        tables = self.raw_tables(nil)
+        tables = raw_tables(nil)
         tables_removed = []
         until @database.total_size <= size
           table = tables.shift
@@ -162,34 +156,32 @@ module Postal
       # Build a query to load a table
       #
       def create_table_query(table_name, options)
-        String.new.tap do |s|
+        ''.tap do |s|
           s << "CREATE TABLE `#{@database.database_name}`.`#{table_name}` ("
           s << options[:columns].map do |column_name, column_options|
             "`#{column_name}` #{column_options}"
           end.join(', ')
           if options[:indexes]
-            s << ", "
+            s << ', '
             s << options[:indexes].map do |index_name, index_options|
               "KEY `#{index_name}` (#{index_options}) USING BTREE"
             end.join(', ')
           end
           if options[:unique_indexes]
-            s << ", "
+            s << ', '
             s << options[:unique_indexes].map do |index_name, index_options|
               "UNIQUE KEY `#{index_name}` (#{index_options})"
             end.join(', ')
           end
-          if options[:primary_key]
-            s << ", PRIMARY KEY (#{options[:primary_key]})"
-          else
-            s << ", PRIMARY KEY (`id`)"
-          end
+          s << if options[:primary_key]
+                 ", PRIMARY KEY (#{options[:primary_key]})"
+               else
+                 ', PRIMARY KEY (`id`)'
+               end
 
-          s << ") ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;"
+          s << ') ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;'
         end
       end
-
-
     end
   end
 end

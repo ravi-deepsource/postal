@@ -7,11 +7,9 @@ bind            "tcp://#{bind_address}:#{bind_port}"
 environment     Postal.config.rails&.environment || 'development'
 prune_bundler
 quiet false
-rackup File.expand_path('../../lib/postal/fast_server/config.ru', __FILE__)
+rackup File.expand_path('../lib/postal/fast_server/config.ru', __dir__)
 unless ENV['LOG_TO_STDOUT']
   stdout_redirect Postal.app_root.join('log', 'puma.fast.log'), Postal.app_root.join('log', 'puma.fast.log'), true
 end
 
-if ENV['APP_ROOT']
-  directory ENV['APP_ROOT']
-end
+directory ENV['APP_ROOT'] if ENV['APP_ROOT']

@@ -1,5 +1,4 @@
 class IPPoolRulesController < ApplicationController
-
   include WithinOrganization
 
   before_action do
@@ -12,11 +11,11 @@ class IPPoolRulesController < ApplicationController
   end
 
   def index
-    if @server
-      @ip_pool_rules = @server.ip_pool_rules
-    else
-      @ip_pool_rules = organization.ip_pool_rules
-    end
+    @ip_pool_rules = if @server
+                       @server.ip_pool_rules
+                     else
+                       organization.ip_pool_rules
+                     end
   end
 
   def new
@@ -51,5 +50,4 @@ class IPPoolRulesController < ApplicationController
   def safe_params
     params.require(:ip_pool_rule).permit(:from_text, :to_text, :ip_pool_id)
   end
-
 end

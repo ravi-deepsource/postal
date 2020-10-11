@@ -1,6 +1,5 @@
 module Postal
   class BounceMessage
-
     def initialize(server, message)
       @server = server
       @message = message
@@ -12,7 +11,7 @@ module Postal
       mail.from = "Mail Delivery Service <#{@message.route.description}>"
       mail.subject = "Mail Delivery Failed (#{@message.subject})"
       mail.text_part = body
-      mail.attachments['Original Message.eml'] = {:mime_type => 'message/rfc822', :encoding => 'quoted-printable', :content => @message.raw_message}
+      mail.attachments['Original Message.eml'] = { mime_type: 'message/rfc822', encoding: 'quoted-printable', content: @message.raw_message }
       mail.message_id = "<#{SecureRandom.uuid}@#{Postal.config.dns.return_path}>"
       mail.to_s
     end
@@ -23,7 +22,7 @@ module Postal
       message.rcpt_to = @message.mail_from
       message.mail_from = @message.route.description
       message.domain_id = @message.domain&.id
-      message.raw_message = self.raw_message
+      message.raw_message = raw_message
       message.bounce = 1
       message.bounce_for_id = @message.id
       message.save
@@ -50,6 +49,5 @@ module Postal
         Rcpt To: #{@message.rcpt_to}
       BODY
     end
-
   end
 end

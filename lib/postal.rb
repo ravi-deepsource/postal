@@ -1,5 +1,4 @@
 module Postal
-
   extend ActiveSupport::Autoload
 
   eager_autoload do
@@ -39,5 +38,4 @@ module Postal
     Postal::FastServer.eager_load!
     Postal::SMTPServer.eager_load!
   end
-
 end

@@ -1,7 +1,3 @@
 class TidyRawMessagesJob < Postal::Job
-
-  def perform
-
-  end
-
+  def perform; end
 end

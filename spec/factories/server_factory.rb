@@ -40,13 +40,11 @@
 #
 
 FactoryBot.define do
-
   factory :server do
     association :organization
-    name { "Mail Server" }
-    mode { "Live" }
+    name { 'Mail Server' }
+    mode { 'Live' }
     provision_database { false }
     sequence(:permalink) { |n| "server#{n}" }
   end
-
 end

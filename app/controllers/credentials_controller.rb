@@ -1,5 +1,4 @@
 class CredentialsController < ApplicationController
-
   include WithinOrganization
 
   before_action { @server = organization.servers.present.find_by_permalink!(params[:server_id]) }
@@ -34,5 +33,4 @@ class CredentialsController < ApplicationController
     @credential.destroy
     redirect_to_with_json [organization, @server, :credentials]
   end
-
 end

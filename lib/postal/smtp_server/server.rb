@@ -4,7 +4,6 @@ require 'nio'
 module Postal
   module SMTPServer
     class Server
-
       def initialize(options = {})
         @options = options
         @options[:debug] ||= false
@@ -15,22 +14,19 @@ module Postal
         $\ = "\r\n"
         BasicSocket.do_not_reverse_lookup = true
 
-        trap("USR1") do
-          STDOUT.puts "Received USR1 signal, respawning."
+        trap('USR1') do
+          STDOUT.puts 'Received USR1 signal, respawning.'
           fork do
-            if ENV['APP_ROOT']
-              Dir.chdir(ENV['APP_ROOT'])
-            end
+            Dir.chdir(ENV['APP_ROOT']) if ENV['APP_ROOT']
             ENV.delete('BUNDLE_GEMFILE')
-            exec("bundle exec --keep-file-descriptors rake postal:smtp_server", :close_others => false)
+            exec('bundle exec --keep-file-descriptors rake postal:smtp_server', close_others: false)
           end
         end
 
-        trap("TERM") do
-          STDOUT.puts "Received TERM signal, shutting down."
+        trap('TERM') do
+          STDOUT.puts 'Received TERM signal, shutting down.'
           unlisten
         end
-
       end
 
       def ssl_context
@@ -38,7 +34,7 @@ module Postal
           ssl_context      = OpenSSL::SSL::SSLContext.new
           ssl_context.cert = Postal.smtp_certificates[0]
           ssl_context.extra_chain_cert = Postal.smtp_certificates[1..-1]
-          ssl_context.key  = Postal.smtp_private_key
+          ssl_context.key = Postal.smtp_private_key
           ssl_context.ssl_version = Postal.config.smtp_server.ssl_version if Postal.config.smtp_server.ssl_version
           ssl_context.ciphers = Postal.config.smtp_server.tls_ciphers if Postal.config.smtp_server.tls_ciphers
           ssl_context
@@ -46,11 +42,11 @@ module Postal
       end
 
       def listen
-        if ENV['SERVER_FD']
-          @server = TCPServer.for_fd(ENV['SERVER_FD'].to_i)
-        else
-          @server = TCPServer.open('::', Postal.config.smtp_server.port)
-        end
+        @server = if ENV['SERVER_FD']
+                    TCPServer.for_fd(ENV['SERVER_FD'].to_i)
+                  else
+                    TCPServer.open('::', Postal.config.smtp_server.port)
+                  end
         @server.autoclose = false
         @server.close_on_exec = false
         if defined?(Socket::SOL_SOCKET) && defined?(Socket::SO_KEEPALIVE)
@@ -81,7 +77,7 @@ module Postal
         # Register the SMTP listener
         @io_selector.register(@server, :r)
         # Create a hash to contain a buffer for each client.
-        buffers = Hash.new { |h, k| h[k] = String.new.force_encoding('BINARY') }
+        buffers = Hash.new { |h, k| h[k] = ''.force_encoding('BINARY') }
         loop do
           # Wait for an event to occur
           @io_selector.select do |monitor|
@@ -112,17 +108,25 @@ module Postal
                 # Register the client and its socket with nio4r
                 monitor = @io_selector.register(new_io, :r)
                 monitor.value = client
-              rescue => e
+              rescue StandardError => e
                 # If something goes wrong, log as appropriate and disconnect the client
                 if defined?(Raven)
-                  Raven.capture_exception(e, :extra => {:log_id => (client.id rescue nil)})
+                  Raven.capture_exception(e, extra: { log_id: begin
+                                                                     client.id
+                                                              rescue StandardError
+                                                                nil
+                                                                   end })
                 end
-                logger.error "An error occurred while accepting a new client."
+                logger.error 'An error occurred while accepting a new client.'
                 logger.error "#{e.class}: #{e.message}"
                 e.backtrace.each do |line|
                   logger.error line
                 end
-                new_io.close rescue nil
+                begin
+                  new_io.close
+                rescue StandardError
+                  nil
+                end
               end
             else
               # This event is not an incoming connection so it must be data from a client
@@ -136,12 +140,10 @@ module Postal
                   # There is an extra step for SSL sockets
                   case io
                   when OpenSSL::SSL::SSLSocket
-                    buffers[io] << io.readpartial(10240)
-                    while(io.pending > 0)
-                      buffers[io] << io.readpartial(10240)
-                    end
+                    buffers[io] << io.readpartial(10_240)
+                    buffers[io] << io.readpartial(10_240) while io.pending > 0
                   else
-                    buffers[io] << io.readpartial(10240)
+                    buffers[io] << io.readpartial(10_240)
                   end
                 rescue EOFError, Errno::ECONNRESET, Errno::ETIMEDOUT
                   # Client went away
@@ -159,17 +161,17 @@ module Postal
                   # Send the received line to the client object for processing
                   result = client.handle(line)
                   # If the client object returned some data, write it back to the client
-                  unless result.nil?
-                    result = [result] unless result.is_a?(Array)
-                    result.compact.each do |line|
-                      client.log "\e[34m=> #{line.strip}\e[0m"
-                      begin
-                        io.write(line.to_s + "\r\n")
-                        io.flush
-                      rescue Errno::ECONNRESET
-                        # Client disconnected before we could write response
-                        eof = true
-                      end
+                  next if result.nil?
+
+                  result = [result] unless result.is_a?(Array)
+                  result.compact.each do |line|
+                    client.log "\e[34m=> #{line.strip}\e[0m"
+                    begin
+                      io.write(line.to_s + "\r\n")
+                      io.flush
+                    rescue Errno::ECONNRESET
+                      # Client disconnected before we could write response
+                      eof = true
                     end
                   end
                 end
@@ -205,15 +207,17 @@ module Postal
                   buffers.delete(io)
                   io.close
                   # If we have no more clients or listeners left, exit the process
-                  if @io_selector.empty?
-                    Process.exit(0)
-                  end
+                  Process.exit(0) if @io_selector.empty?
                 end
-              rescue => e
+              rescue StandardError => e
                 # Something went wrong, log as appropriate
                 client_id = client ? client.id : '------'
                 if defined?(Raven)
-                  Raven.capture_exception(e, :extra => {:log_id => (client.id rescue nil)})
+                  Raven.capture_exception(e, extra: { log_id: begin
+                                                                     client.id
+                                                              rescue StandardError
+                                                                nil
+                                                                   end })
                 end
                 logger.error "[#{client_id}] An error occurred while processing data from a client."
                 logger.error "[#{client_id}] #{e.class}: #{e.message}"
@@ -221,34 +225,36 @@ module Postal
                   logger.error "[#{client_id}] #{line}"
                 end
                 # Close all IO and forget this client
-                @io_selector.deregister(io) rescue nil
-                buffers.delete(io)
-                io.close rescue nil
-                if @io_selector.empty?
-                  Process.exit(0)
+                begin
+                  @io_selector.deregister(io)
+                rescue StandardError
+                  nil
                 end
+                buffers.delete(io)
+                begin
+                  io.close
+                rescue StandardError
+                  nil
+                end
+                Process.exit(0) if @io_selector.empty?
               end
             end
           end
           # If unlisten has been called, stop listening
-          if $unlisten
-            @io_selector.deregister(@server)
-            @server.close
-            # If there's nothing left to do, shut down the process
-            if @io_selector.empty?
-              Process.exit(0)
-            end
-            # Clear the request
-            $unlisten = false
-          end
+          next unless $unlisten
+
+          @io_selector.deregister(@server)
+          @server.close
+          # If there's nothing left to do, shut down the process
+          Process.exit(0) if @io_selector.empty?
+          # Clear the request
+          $unlisten = false
         end
       end
 
       def run
         # Write PID to file if path specified
-        if ENV['PID_FILE']
-          File.open(ENV['PID_FILE'], 'w') { |f| f.write(Process.pid.to_s + "\n") }
-        end
+        File.open(ENV['PID_FILE'], 'w') { |f| f.write(Process.pid.to_s + "\n") } if ENV['PID_FILE']
         # If we have been spawned to replace an existing processm shut down the
         # parent after listening.
         if ENV['SERVER_FD']
@@ -265,7 +271,6 @@ module Postal
       def logger
         Postal.logger_for(:smtp_server)
       end
-
     end
   end
 end

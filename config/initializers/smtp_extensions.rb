@@ -29,6 +29,6 @@ class Net::SMTP
   private
 
   def tcp_socket(address, port)
-    TCPSocket.open(address, port, self.source_address)
+    TCPSocket.open(address, port, source_address)
   end
 end

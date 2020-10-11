@@ -21,23 +21,22 @@
 #
 
 class Route < ApplicationRecord
-
-  MODES = ['Endpoint', 'Accept', 'Hold', 'Bounce', 'Reject']
+  MODES = %w[Endpoint Accept Hold Bounce Reject].freeze
 
   include HasUUID
 
   belongs_to :server
-  belongs_to :domain, :optional => true
-  belongs_to :endpoint, :polymorphic => true, :optional => true
-  has_many :additional_route_endpoints, :dependent => :destroy
+  belongs_to :domain, optional: true
+  belongs_to :endpoint, polymorphic: true, optional: true
+  has_many :additional_route_endpoints, dependent: :destroy
 
-  SPAM_MODES = ['Mark', 'Quarantine', 'Fail']
-  ENDPOINT_TYPES = ['SMTPEndpoint', 'HTTPEndpoint', 'AddressEndpoint']
+  SPAM_MODES = %w[Mark Quarantine Fail].freeze
+  ENDPOINT_TYPES = %w[SMTPEndpoint HTTPEndpoint AddressEndpoint].freeze
 
-  validates :name, :presence => true, :format => /\A(([a-z0-9\-\.]*)|(\*)|(__returnpath__))\z/
-  validates :spam_mode, :inclusion => {:in => SPAM_MODES}
-  validates :endpoint, :presence => {:if => proc { self.mode == 'Endpoint' }}
-  validates :domain_id, :presence => {:unless => :return_path?}
+  validates :name, presence: true, format: /\A(([a-z0-9\-\.]*)|(\*)|(__returnpath__))\z/
+  validates :spam_mode, inclusion: { in: SPAM_MODES }
+  validates :endpoint, presence: { if: proc { mode == 'Endpoint' } }
+  validates :domain_id, presence: { unless: :return_path? }
   validate :validate_route_is_routed
   validate :validate_domain_belongs_to_server
   validate :validate_endpoint_belongs_to_server
@@ -47,15 +46,15 @@ class Route < ApplicationRecord
 
   after_save :save_additional_route_endpoints
 
-  random_string :token, :type => :chars, :length => 8, :unique => true
+  random_string :token, type: :chars, length: 8, unique: true
 
   def return_path?
-    name == "__returnpath__"
+    name == '__returnpath__'
   end
 
   def description
     if return_path?
-      "Return Path"
+      'Return Path'
     else
       "#{name}@#{domain.name}"
     end
@@ -63,10 +62,10 @@ class Route < ApplicationRecord
 
   def _endpoint
     @endpoint ||= begin
-      if self.mode == 'Endpoint'
+      if mode == 'Endpoint'
         endpoint ? "#{endpoint.class}##{endpoint.uuid}" : nil
       else
-        self.mode
+        mode
       end
     end
   end
@@ -78,9 +77,8 @@ class Route < ApplicationRecord
     else
       if value =~ /\#/
         class_name, id = value.split('#', 2)
-        unless ENDPOINT_TYPES.include?(class_name)
-          raise Postal::Error, "Invalid endpoint class name '#{class_name}'"
-        end
+        raise Postal::Error, "Invalid endpoint class name '#{class_name}'" unless ENDPOINT_TYPES.include?(class_name)
+
         self.endpoint = class_name.constantize.find_by_uuid(id)
         self.mode = 'Endpoint'
       else
@@ -95,7 +93,7 @@ class Route < ApplicationRecord
   end
 
   def wildcard?
-    self.name == '*'
+    name == '*'
   end
 
   def additional_route_endpoints_array
@@ -113,44 +111,45 @@ class Route < ApplicationRecord
         if existing = additional_route_endpoints.find_by_endpoint(item)
           seen << existing.id
         else
-          route = additional_route_endpoints.build(:_endpoint => item)
+          route = additional_route_endpoints.build(_endpoint: item)
           if route.save
             seen << route.id
           else
-            route.errors.each do |field, message|
+            route.errors.each do |_field, message|
               errors.add :base, message
             end
             raise ActiveRecord::RecordInvalid
           end
         end
       end
-      additional_route_endpoints.where.not(:id => seen).destroy_all
+      additional_route_endpoints.where.not(id: seen).destroy_all
     end
   end
 
   #
   # This message will create a suitable number of message objects for messages that
-  # are destined for this route. It receives a block which can set the message content
+  #  are destined for this route. It receives a block which can set the message content
   # but most information is specified already.
   #
   # Returns an array of created messages.
   #
   def create_messages(&block)
     messages = []
-    message = self.build_message
-    if self.mode == 'Endpoint' && self.server.message_db.schema_version >= 18
-      message.endpoint_type = self.endpoint_type
-      message.endpoint_id = self.endpoint_id
+    message = build_message
+    if mode == 'Endpoint' && server.message_db.schema_version >= 18
+      message.endpoint_type = endpoint_type
+      message.endpoint_id = endpoint_id
     end
     block.call(message)
     message.save
     messages << message
 
     # Also create any messages for additional endpoints that might exist
-    if self.mode == 'Endpoint' && self.server.message_db.schema_version >= 18
-      self.additional_route_endpoints.each do |endpoint|
+    if mode == 'Endpoint' && server.message_db.schema_version >= 18
+      additional_route_endpoints.each do |endpoint|
         next unless endpoint.endpoint
-        message = self.build_message
+
+        message = build_message
         message.endpoint_id = endpoint.endpoint_id
         message.endpoint_type = endpoint.endpoint_type
         block.call(message)
@@ -163,71 +162,61 @@ class Route < ApplicationRecord
   end
 
   def build_message
-    message = self.server.message_db.new_message
+    message = server.message_db.new_message
     message.scope = 'incoming'
-    message.rcpt_to = self.description
-    message.domain_id = self.domain&.id
-    message.route_id = self.id
+    message.rcpt_to = description
+    message.domain_id = domain&.id
+    message.route_id = id
     message
   end
 
   private
 
   def validate_route_is_routed
-    if self.mode.nil?
-      errors.add :endpoint, "must be chosen"
-    end
+    errors.add :endpoint, 'must be chosen' if mode.nil?
   end
 
   def validate_domain_belongs_to_server
-    if self.domain && ![self.server, self.server.organization].include?(self.domain.owner)
-      errors.add :domain, :invalid
-    end
+    errors.add :domain, :invalid if domain && ![server, server.organization].include?(domain.owner)
 
-    if self.domain && !self.domain.verified?
-      errors.add :domain, "has not been verified yet"
-    end
+    errors.add :domain, 'has not been verified yet' if domain && !domain.verified?
   end
 
   def validate_endpoint_belongs_to_server
-    if self.endpoint && self.endpoint&.server != self.server
-      errors.add :endpoint, :invalid
-    end
+    errors.add :endpoint, :invalid if endpoint && endpoint&.server != server
   end
 
   def validate_name_uniqueness
-    return if self.server.nil?
-    if self.domain
-      if route = Route.includes(:domain).where(:domains => {:name => self.domain.name}, :name => self.name).where.not(:id => self.id).first
+    return if server.nil?
+
+    if domain
+      if route = Route.includes(:domain).where(domains: { name: domain.name }, name: name).where.not(id: id).first
         errors.add :name, "is configured on the #{route.server.full_permalink} mail server"
       end
     else
-      if route = Route.where(:name => "__returnpath__").where.not(:id => self.id).exists?
-        errors.add :base, "A return path route already exists for this server"
+      if route = Route.where(name: '__returnpath__').where.not(id: id).exists?
+        errors.add :base, 'A return path route already exists for this server'
       end
     end
   end
 
   def validate_return_path_route_endpoints
     if return_path?
-      if self.mode != 'Endpoint' || self.endpoint_type != 'HTTPEndpoint'
-        errors.add :base, "Return path routes must point to an HTTP endpoint"
+      if mode != 'Endpoint' || endpoint_type != 'HTTPEndpoint'
+        errors.add :base, 'Return path routes must point to an HTTP endpoint'
       end
     end
   end
 
   def validate_no_additional_routes_on_non_endpoint_route
-    if self.mode != 'Endpoint' && !self.additional_route_endpoints_array.empty?
-      errors.add :base, "Additional routes are not permitted unless the primary route is an actual endpoint"
+    if mode != 'Endpoint' && !additional_route_endpoints_array.empty?
+      errors.add :base, 'Additional routes are not permitted unless the primary route is an actual endpoint'
     end
   end
 
   def self.find_by_name_and_domain(name, domain)
-    route = Route.includes(:domain).where(:name => name, :domains => {:name => domain}).first
-    if route.nil?
-      route = Route.includes(:domain).where(:name => '*', :domains => {:name => domain}).first
-    end
+    route = Route.includes(:domain).where(name: name, domains: { name: domain }).first
+    route = Route.includes(:domain).where(name: '*', domains: { name: domain }).first if route.nil?
     route
   end
-
 end

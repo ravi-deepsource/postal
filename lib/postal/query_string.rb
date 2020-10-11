@@ -1,8 +1,7 @@
 module Postal
   class QueryString
-
     def initialize(string)
-      @string = string.strip + " "
+      @string = string.strip + ' '
     end
 
     def [](value)
@@ -15,15 +14,15 @@ module Postal
 
     def to_hash
       @hash ||= @string.scan(/([a-z]+)\:\s*(?:(\d{2,4}\-\d{2}-\d{2}\s\d{2}\:\d{2})|\"(.*?)\"|(.*?))(\s|\z)/).each_with_object({}) do |(key, date, string_with_spaces, value), hash|
-        if date
-          actual_value = date
-        elsif string_with_spaces
-          actual_value = string_with_spaces
-        elsif value == "[blank]"
-          actual_value = nil
-        else
-          actual_value = value
-        end
+        actual_value = if date
+                         date
+                       elsif string_with_spaces
+                         string_with_spaces
+                       elsif value == '[blank]'
+                         nil
+                       else
+                         value
+                       end
 
         if hash.keys.include?(key.to_s)
           hash[key.to_s] = [hash[key.to_s]].flatten
@@ -33,6 +32,5 @@ module Postal
         end
       end
     end
-
   end
 end

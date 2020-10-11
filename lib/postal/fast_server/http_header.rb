@@ -4,7 +4,7 @@ module Postal
       attr_accessor :key, :value
       def self.from_string(string)
         k, v = string.to_s.split(/\:\s*/, 2)
-        self.new(k.to_s, v.to_s)
+        new(k.to_s, v.to_s)
       end
 
       def initialize(k, v)
@@ -13,9 +13,8 @@ module Postal
       end
 
       def to_s
-        @key + ": " + @value
+        @key + ': ' + @value
       end
     end
-
   end
 end

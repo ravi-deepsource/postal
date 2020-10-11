@@ -1,12 +1,12 @@
 require_relative 'boot'
 
-require "rails"
-require "active_model/railtie"
-require "active_record/railtie"
-require "action_controller/railtie"
-require "action_mailer/railtie"
-require "action_view/railtie"
-require "sprockets/railtie"
+require 'rails'
+require 'active_model/railtie'
+require 'active_record/railtie'
+require 'action_controller/railtie'
+require 'action_mailer/railtie'
+require 'action_view/railtie'
+require 'sprockets/railtie'
 
 # Require the gems listed in Gemfile, including any gems
 # you've limited to :test, :development, or :production.
@@ -30,6 +30,6 @@ module Postal
     config.eager_load_namespaces << Postal
 
     # Disable field_with_errors
-    config.action_view.field_error_proc = Proc.new { |t, i| t }
+    config.action_view.field_error_proc = proc { |t, _i| t }
   end
 end

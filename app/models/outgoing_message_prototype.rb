@@ -1,7 +1,6 @@
 require 'resolv'
 
 class OutgoingMessagePrototype
-
   attr_accessor :from
   attr_accessor :sender
   attr_accessor :to
@@ -29,9 +28,7 @@ class OutgoingMessagePrototype
     end
   end
 
-  def message_id
-    @message_id
-  end
+  attr_reader :message_id
 
   def from_address
     Postal::Helpers.strip_name_from_address(@from)
@@ -51,9 +48,7 @@ class OutgoingMessagePrototype
   def find_domain
     @domain ||= begin
       domain = @server.authenticated_domain_for_address(@from)
-      if @server.allow_sender? && domain.nil?
-        domain = @server.authenticated_domain_for_address(@sender)
-      end
+      domain = @server.authenticated_domain_for_address(@sender) if @server.allow_sender? && domain.nil?
       domain || :none
     end
   end
@@ -98,50 +93,36 @@ class OutgoingMessagePrototype
   def attachments
     (@attachments || []).map do |attachment|
       {
-        :name => attachment[:name],
-        :content_type => attachment[:content_type] || 'application/octet-stream',
-        :data => attachment[:base64] ? Base64.decode64(attachment[:data]) : attachment[:data]
+        name: attachment[:name],
+        content_type: attachment[:content_type] || 'application/octet-stream',
+        data: attachment[:base64] ? Base64.decode64(attachment[:data]) : attachment[:data]
       }
     end
   end
 
   def validate
-    @errors = Array.new
+    @errors = []
 
-    if to_addresses.empty? && cc_addresses.empty? && bcc_addresses.empty?
-      @errors << "NoRecipients"
-    end
+    @errors << 'NoRecipients' if to_addresses.empty? && cc_addresses.empty? && bcc_addresses.empty?
 
-    if to_addresses.size > 50
-      @errors << 'TooManyToAddresses'
-    end
+    @errors << 'TooManyToAddresses' if to_addresses.size > 50
 
-    if cc_addresses.size > 50
-      @errors << 'TooManyCCAddresses'
-    end
+    @errors << 'TooManyCCAddresses' if cc_addresses.size > 50
 
-    if bcc_addresses.size > 50
-      @errors << 'TooManyBCCAddresses'
-    end
+    @errors << 'TooManyBCCAddresses' if bcc_addresses.size > 50
 
-    if @plain_body.blank? && @html_body.blank?
-      @errors << "NoContent"
-    end
+    @errors << 'NoContent' if @plain_body.blank? && @html_body.blank?
 
-    if from.blank?
-      @errors << "FromAddressMissing"
-    end
+    @errors << 'FromAddressMissing' if from.blank?
 
-    if domain.nil?
-      @errors << "UnauthenticatedFromAddress"
-    end
+    @errors << 'UnauthenticatedFromAddress' if domain.nil?
 
     if attachments && !attachments.empty?
-      attachments.each_with_index do |attachment, index|
+      attachments.each_with_index do |attachment, _index|
         if attachment[:name].blank?
-          @errors << "AttachmentMissingName" unless @errors.include?("AttachmentMissingName")
+          @errors << 'AttachmentMissingName' unless @errors.include?('AttachmentMissingName')
         elsif attachment[:data].blank?
-          @errors << "AttachmentMissingData" unless @errors.include?("AttachmentMissingData")
+          @errors << 'AttachmentMissingData' unless @errors.include?('AttachmentMissingData')
         end
       end
     end
@@ -151,11 +132,9 @@ class OutgoingMessagePrototype
   def raw_message
     @raw_message ||= begin
       mail = Mail.new
-      if @custom_headers.is_a?(Hash)
-        @custom_headers.each { |key, value| mail[key.to_s] = value.to_s }
-      end
-      mail.to = self.to_addresses.join(', ') if self.to_addresses.present?
-      mail.cc = self.cc_addresses.join(', ') if self.cc_addresses.present?
+      @custom_headers.each { |key, value| mail[key.to_s] = value.to_s } if @custom_headers.is_a?(Hash)
+      mail.to = to_addresses.join(', ') if to_addresses.present?
+      mail.cc = cc_addresses.join(', ') if cc_addresses.present?
       mail.from = @from
       mail.sender = @sender
       mail.subject = @subject
@@ -163,23 +142,23 @@ class OutgoingMessagePrototype
       if @html_body.blank? && attachments.empty?
         mail.body = @plain_body
       else
-        if !@plain_body.blank?
+        unless @plain_body.blank?
           mail.text_part = Mail::Part.new
           mail.text_part.body = @plain_body
         end
-        if !@html_body.blank?
+        unless @html_body.blank?
           mail.html_part = Mail::Part.new
-          mail.html_part.content_type = "text/html; charset=UTF-8"
+          mail.html_part.content_type = 'text/html; charset=UTF-8'
           mail.html_part.body = @html_body
         end
       end
       attachments.each do |attachment|
         mail.attachments[attachment[:name]] = {
-          :mime_type => attachment[:content_type],
-          :content => attachment[:data]
+          mime_type: attachment[:content_type],
+          content: attachment[:data]
         }
       end
-      mail.header['Received'] = "from #{@source_type} (#{self.resolved_hostname} [#{@ip}]) by Postal with HTTP; #{Time.now.utc.rfc2822.to_s}"
+      mail.header['Received'] = "from #{@source_type} (#{resolved_hostname} [#{@ip}]) by Postal with HTTP; #{Time.now.utc.rfc2822}"
       mail.message_id = "<#{@message_id}>"
       mail.to_s
     end
@@ -189,19 +168,22 @@ class OutgoingMessagePrototype
     message = @server.message_db.new_message
     message.scope = 'outgoing'
     message.rcpt_to = address
-    message.mail_from = self.from_address
-    message.domain_id = self.domain.id
-    message.raw_message = self.raw_message
-    message.tag = self.tag
-    message.credential_id = self.credential&.id
+    message.mail_from = from_address
+    message.domain_id = domain.id
+    message.raw_message = raw_message
+    message.tag = tag
+    message.credential_id = credential&.id
     message.received_with_ssl = true
     message.bounce = @bounce ? 1 : 0
     message.save
-    {:id => message.id, :token => message.token}
+    { id: message.id, token: message.token }
   end
 
   def resolved_hostname
-    @resolved_hostname ||= Resolv.new.getname(@ip) rescue @ip
+    @resolved_hostname ||= begin
+                             Resolv.new.getname(@ip)
+                           rescue StandardError
+                             @ip
+                           end
   end
-
 end

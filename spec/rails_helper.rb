@@ -1,13 +1,13 @@
-ENV['POSTAL_CONFIG_ROOT'] = File.expand_path('../config', __FILE__)
+ENV['POSTAL_CONFIG_ROOT'] = File.expand_path('config', __dir__)
 
-require File.expand_path('../../config/environment', __FILE__)
+require File.expand_path('../config/environment', __dir__)
 require 'rspec/rails'
 require 'spec_helper'
 require 'factory_bot'
 require 'database_cleaner'
 
-FACTORIES_EXCLUDED_FROM_LINT = []
-Dir[File.expand_path('../factories/*.rb', __FILE__)].each { |f| require f }
+FACTORIES_EXCLUDED_FROM_LINT = [].freeze
+Dir[File.expand_path('factories/*.rb', __dir__)].each { |f| require f }
 
 ActiveRecord::Migration.maintain_test_schema!
 RSpec.configure do |config|
@@ -30,7 +30,7 @@ RSpec.configure do |config|
     # Because the mail databases don't use any transactions, all data left in the
     # database will be left there unless removed.
     DatabaseCleaner.start
-    GLOBAL_SERVER = FactoryBot.create(:server, :provision_database => true)
+    GLOBAL_SERVER = FactoryBot.create(:server, provision_database: true)
   end
 
   config.after(:suite) do
@@ -41,5 +41,4 @@ RSpec.configure do |config|
       DatabaseCleaner.clean
     end
   end
-
 end

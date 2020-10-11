@@ -1,6 +1,5 @@
 module Postal
   class DKIMHeader
-
     def initialize(domain, message)
       if domain && domain.dkim_status == 'OK'
         @domain_name = domain.name
@@ -17,7 +16,7 @@ module Postal
     end
 
     def dkim_header
-      "DKIM-Signature: v=1;" + dkim_properties + signature
+      'DKIM-Signature: v=1;' + dkim_properties + signature
     end
 
     private
@@ -27,11 +26,11 @@ module Postal
     end
 
     def header_names
-      normalized_headers.map{ |h| h.split(':')[0].strip }
+      normalized_headers.map { |h| h.split(':')[0].strip }
     end
 
     def normalized_headers
-      Array.new.tap do |new_headers|
+      [].tap do |new_headers|
         headers.select { |h| h.match(/^(to|from|date|subject|message-id):/i) }.each do |h|
           new_headers << normalize_header(h)
         end
@@ -40,7 +39,7 @@ module Postal
 
     def normalize_header(content)
       content.gsub!(/[ \t]+/, ' ')                          # Tidy whitespace
-      key, value = content.split(':', 2).map{ |a| a.strip } # Split into key/value and strip whitespace
+      key, value = content.split(':', 2).map { |a| a.strip } # Split into key/value and strip whitespace
       key.downcase!                                         # Downcase the key
       key + ':' + value                                     # Rejoin
     end
@@ -52,7 +51,7 @@ module Postal
         content.gsub!("\n", "\r\n")     # Convert to CRLF
         content.gsub!(/[ \t]+/, ' ')    # Tidy whitespace
         content.gsub!(" \r\n", "\r\n")  # Remove trailing whitespace
-        content.gsub!(/(\r\n)+\z/, "")  # Remove trailing lines
+        content.gsub!(/(\r\n)+\z/, '')  # Remove trailing lines
         content.gsub!(/\z/, "\r\n")     # Add a final newline
         content
       end
@@ -63,16 +62,16 @@ module Postal
     end
 
     def dkim_properties
-      String.new.tap do |header|
-        header << " a=rsa-sha256; c=relaxed/relaxed;"
+      ''.tap do |header|
+        header << ' a=rsa-sha256; c=relaxed/relaxed;'
         header << " d=#{@domain_name}; s=#{@dkim_identifier}; t=#{Time.now.utc.to_i};"
         header << " bh=#{body_hash}; h=#{header_names.join(':')};"
-        header << " b="
+        header << ' b='
       end
     end
 
     def dkim_header_for_signing
-      "dkim-signature:v=1;" + dkim_properties
+      'dkim-signature:v=1;' + dkim_properties
     end
 
     def signable_header_string
@@ -82,6 +81,5 @@ module Postal
     def signature
       Base64.encode64(@dkim_key.sign(OpenSSL::Digest::SHA256.new, signable_header_string)).gsub("\n", '')
     end
-
   end
 end

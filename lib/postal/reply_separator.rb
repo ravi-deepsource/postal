@@ -1,6 +1,5 @@
 module Postal
   class ReplySeparator
-
     RULES = [
       /^-{2,10} $.*/m,
       /^\>*\s*----- ?Original Message ?-----.*/m,
@@ -12,13 +11,14 @@ module Postal
       /^\>*\s*On.{10,200}wrote:\s*$.*/m,
       /^\>*\s*Sent from my.*/m,
       /^\>*\s*=== Please reply above this line ===.*/m,
-      /(^\>.*\n?){10,}/,
-    ]
+      /(^\>.*\n?){10,}/
+    ].freeze
 
     def self.separate(text)
       return '' unless text.is_a?(String)
+
       text = text.gsub("\r", '')
-      stripped = ""
+      stripped = ''
       RULES.each do |rule|
         text.gsub!(rule) do
           stripped = $&.to_s + "\n" + stripped
@@ -28,6 +28,5 @@ module Postal
       stripped = stripped.strip
       [text.strip, stripped.blank? ? nil : stripped]
     end
-
   end
 end

@@ -24,44 +24,41 @@
 #
 
 class User < ApplicationRecord
-
   include HasUUID
 
   require_dependency 'user/authentication'
 
-  validates :first_name, :presence => true
-  validates :last_name, :presence => true
-  validates :email_address, :presence => true, :uniqueness => true, :format => {:with => /@/}
-  validates :time_zone, :presence => true
+  validates :first_name, presence: true
+  validates :last_name, presence: true
+  validates :email_address, presence: true, uniqueness: true, format: { with: /@/ }
+  validates :time_zone, presence: true
 
   default_value :time_zone, -> { 'UTC' }
 
-  has_many :organization_users, :dependent => :destroy, :as => :user
-  has_many :organizations, :through => :organization_users
+  has_many :organization_users, dependent: :destroy, as: :user
+  has_many :organizations, through: :organization_users
 
-  scope :verified, -> { where.not(:email_verified_at => nil) }
+  scope :verified, -> { where.not(email_verified_at: nil) }
 
-  when_attribute :email_address, :changes_to => :anything do
-    before_save do |was, now|
-      unless self.new_record? && self.email_verified_at
-        self.email_verification_token = rand(999999).to_s.rjust(6, '0')
+  when_attribute :email_address, changes_to: :anything do
+    before_save do |_was, _now|
+      unless new_record? && email_verified_at
+        self.email_verification_token = rand(999_999).to_s.rjust(6, '0')
         self.email_verified_at = nil
       end
     end
 
-    after_commit do |was, new|
-      if self.email_verified_at.nil? && was.present?
-        AppMailer.verify_email_address(self).deliver
-      end
+    after_commit do |was, _new|
+      AppMailer.verify_email_address(self).deliver if email_verified_at.nil? && was.present?
     end
   end
 
   def organizations_scope
     @organizations_scope ||= begin
-      if self.admin?
+      if admin?
         Organization.present
       else
-        self.organizations.present
+        organizations.present
       end
     end
   end
@@ -76,7 +73,7 @@ class User < ApplicationRecord
 
   def verify!
     self.email_verified_at = Time.now
-    self.save!
+    save!
   end
 
   def verified?
@@ -96,11 +93,10 @@ class User < ApplicationRecord
   end
 
   def generate_login_token
-    JWT.encode({'user' => self.id, 'timestamp' => Time.now.to_f}, Postal.signing_key.to_s, 'HS256')
+    JWT.encode({ 'user' => id, 'timestamp' => Time.now.to_f }, Postal.signing_key.to_s, 'HS256')
   end
 
   def self.[](email)
-    where(:email_address => email).first
+    where(email_address: email).first
   end
-
 end
